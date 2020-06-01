@@ -36,7 +36,7 @@ public class PipelineTest extends HydratorTestBase {
                                                       Schema.Field.of("e", Schema.of(Schema.Type.STRING)));
   @Test
   public void testMyTransform() throws Exception {
-    HttpGetTransform.Conf config = new HttpGetTransform.Conf("url",INPUT.toString());
+    HttpGetTransform.Conf config = new HttpGetTransform.Conf("url", INPUT.toString());
     Transform<StructuredRecord, StructuredRecord> transform = new HttpGetTransform(config);
     transform.initialize(null);
 

@@ -26,6 +26,7 @@ import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.api.plugin.PluginConfig;
 import io.cdap.cdap.etl.api.Emitter;
+import io.cdap.cdap.etl.api.InvalidEntry;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.StageConfigurer;
 import io.cdap.cdap.etl.api.Transform;
@@ -48,7 +49,8 @@ import java.util.Map;
 
 /**
  * Transform that can transforms specific fields to lowercase or uppercase.
- * For full documentation, check out: https://docs.cask.co/cdap/current/en/developer-manual/pipelines/developing-plugins/index.html
+ * For full documentation, check out:
+ * https://docs.cask.co/cdap/current/en/developer-manual/pipelines/developing-plugins/index.html
  */
 
 @Plugin(type = Transform.PLUGIN_TYPE)
@@ -181,8 +183,8 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
     List<Schema.Field> fields = outputSchema.getFields();
     for (Schema.Field field : fields) {
       String name = field.getName();
-      if (input.get(name) != null){
-        builder.set(name,input.get(name));
+      if (input.get(name) != null) {
+        builder.set(name, input.get(name));
       }
 
       if (result.get(name) != null) {
@@ -191,6 +193,8 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
     }
 
     emitter.emit(builder.build());
+    emitter.emitError(new InvalidEntry(1, "Invalid", input));
+
 
   }
 
