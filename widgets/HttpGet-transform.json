@@ -10,10 +10,7 @@
           "widget-type": "text",
           "label": "Input field containing URL to invoke.",
           "name": "httpURLField",
-          "description": "List of fields to upper case.",
-          "widget-attributes": {
-            "delimiter": ","
-          }
+          "description": "Field name containing the full URL to use for HTTPGet method."
         }
       ]
     }
@@ -25,9 +22,10 @@
       "widget-type": "schema",
       "widget-attributes": {
         "schema-types": [
-          "bytes"
+          "string"
         ],
-        "schema-default-type": "bytes"
+        "schema-default-type": "string",
+        "property-watch": "format"
       }
     }
   ]

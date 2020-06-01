@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.Charset;
+import java.util.List;
 import java.util.Map;
 
 
@@ -176,9 +177,19 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
 
     String url = input.get(httpURLField);
     Map<String, Object> result = invokeHttp(url);
-    for (Map.Entry<String, Object> entry : result.entrySet()) {
-      builder.set(entry.getKey(), entry.getValue());
+
+    List<Schema.Field> fields = outputSchema.getFields();
+    for (Schema.Field field : fields) {
+      String name = field.getName();
+      if (input.get(name) != null){
+        builder.set(name,input.get(name));
+      }
+
+      if (result.get(name) != null) {
+        builder.set(name, result.get(name));
+      }
     }
+
     emitter.emit(builder.build());
 
   }
