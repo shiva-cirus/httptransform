@@ -26,7 +26,6 @@ import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.api.plugin.PluginConfig;
 import io.cdap.cdap.etl.api.Emitter;
-import io.cdap.cdap.etl.api.InvalidEntry;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.StageConfigurer;
 import io.cdap.cdap.etl.api.Transform;
@@ -191,11 +190,7 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
         builder.set(name, result.get(name));
       }
     }
-
     emitter.emit(builder.build());
-    emitter.emitError(new InvalidEntry(1, "Invalid", input));
-
-
   }
 
 
