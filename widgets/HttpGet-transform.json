@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "spec-version": "1.0"
+  },
+  "configuration-groups": [
+    {
+      "label": "Configuration ",
+      "properties": [
+        {
+          "widget-type": "text",
+          "label": "Input field containing URL to invoke.",
+          "name": "httpURLField",
+          "description": "List of fields to upper case.",
+          "widget-attributes": {
+            "delimiter": ","
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "schema",
+      "label": "schema",
+      "widget-type": "schema",
+      "widget-attributes": {
+        "schema-types": [
+          "bytes"
+        ],
+        "schema-default-type": "bytes"
+      }
+    }
+  ]
+}
