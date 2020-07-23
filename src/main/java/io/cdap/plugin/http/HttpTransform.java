@@ -17,14 +17,11 @@
 package io.cdap.plugin.http;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
 import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
-import io.cdap.cdap.api.plugin.PluginConfig;
 import io.cdap.cdap.etl.api.Emitter;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
 import io.cdap.cdap.etl.api.StageConfigurer;
@@ -34,16 +31,16 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 
 /**
@@ -53,16 +50,16 @@ import java.util.Map;
  */
 
 @Plugin(type = Transform.PLUGIN_TYPE)
-@Name("HttpGet")
+@Name("Http")
 @Description("Transforms configured fields to lowercase or uppercase.")
-public class HttpGetTransform extends Transform<StructuredRecord, StructuredRecord> {
+public class HttpTransform extends Transform<StructuredRecord, StructuredRecord> {
 
   // If you want to log things, you will need this line
-  private static final Logger LOG = LoggerFactory.getLogger(HttpGetTransform.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HttpTransform.class);
 
 
   // Usually, you will need a private variable to store the config that was passed to your class
-  private final Conf config;
+  private final HttpConfig config;
   private Schema outputSchema;
   private String httpURLField;
   private Gson gson;
@@ -70,61 +67,9 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
   /**
    * Config properties for the plugin.
    */
-  public static class Conf extends PluginConfig {
-    public static final String HTTPGET_URL_FIELD = "httpURLField";
-    public static final String OUTPUTSCHEMA_FIELD = "schema";
-
-    @Name(HTTPGET_URL_FIELD)
-    @Description("Field containing HTTP Get URL.")
-    private String httpURLField;
-
-    @Name(OUTPUTSCHEMA_FIELD)
-    @Description("Specifies the schema of the records outputted from this plugin.")
-    private final String schema;
 
 
-    private String getHttpgetUrlField() {
-      return httpURLField;
-    }
-
-    public Conf(String httpURLField, String schema) {
-      this.httpURLField = httpURLField;
-      this.schema = schema;
-    }
-
-    private void validate(Schema inputSchema) throws IllegalArgumentException {
-      // It's usually a good idea to check the schema. Sometimes users edit
-      // the JSON config directly and make mistakes.
-      try {
-        Schema.parseJson(schema);
-      } catch (IOException e) {
-        throw new IllegalArgumentException("Output schema cannot be parsed.", e);
-      }
-      // This method should be used to validate that the configuration is valid.
-      if (httpURLField == null || httpURLField.isEmpty()) {
-        throw new IllegalArgumentException("httpURLField is a required field.");
-      }
-
-      Schema.Field inputField = inputSchema.getField(httpURLField);
-      if (inputField == null) {
-        throw new IllegalArgumentException(
-          String.format("Field '%s' does not exist in input schema %s.", httpURLField, schema));
-      }
-      Schema fieldSchema = inputField.getSchema();
-      Schema.Type fieldType = fieldSchema.isNullable() ? fieldSchema.getNonNullable().getType() : fieldSchema.getType();
-      if (fieldType != Schema.Type.STRING) {
-        throw new IllegalArgumentException(
-          String.format("Field '%s' is of illegal type %s. Must be of type %s.",
-                        httpURLField, fieldType, Schema.Type.STRING));
-      }
-
-      // You can use the containsMacro() function to determine if you can validate at deploy time or runtime.
-      // If your plugin depends on fields from the input schema being present or the right type, use inputSchema
-    }
-
-  }
-
-  public HttpGetTransform(Conf config) {
+  public HttpTransform(HttpConfig config) {
     this.config = config;
   }
 
@@ -143,19 +88,13 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
     StageConfigurer stageConfigurer = pipelineConfigurer.getStageConfigurer();
     // the output schema is always the same as the input schema
     Schema inputSchema = stageConfigurer.getInputSchema();
-
-    // if schema is null, that means it is either not known until runtime, or it is variable
-    if (inputSchema != null) {
-      // if the input schema is constant and known at configure time, check that all configured fields are strings
-      config.validate(inputSchema);
-    }
+    config.validate(inputSchema);
 
     try {
-      pipelineConfigurer.getStageConfigurer().setOutputSchema(Schema.parseJson(config.schema));
+      pipelineConfigurer.getStageConfigurer().setOutputSchema(Schema.parseJson(config.getSchema()));
     } catch (IOException e) {
       throw new IllegalArgumentException("Output schema cannot be parsed.", e);
     }
-
   }
 
   // initialize is called once at the start of each pipeline run
@@ -163,7 +102,7 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
   public void initialize(TransformContext context) throws Exception {
     super.initialize(context);
     httpURLField = config.getHttpgetUrlField();
-    outputSchema = Schema.parseJson(config.schema);
+    outputSchema = Schema.parseJson(config.getSchema());
   }
 
   // transform is called once for each record that goes into this stage
@@ -171,13 +110,14 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
   public void transform(StructuredRecord input, Emitter<StructuredRecord> emitter) throws Exception {
     StructuredRecord.Builder builder = StructuredRecord.builder(outputSchema);
 
-    //Check if input record contains the HTTP URL Get URL
-    if (input.get(httpURLField) == null) {
-      new Exception("Input Record does not contain field " + httpURLField);
-    }
+    String url = getURL(input);
+    String userName = getUserName(input);
+    String pw = getPassword(input);
+    Map<String, String> authHeaders = getAuthHeader(input);
+    Map<String, String> httpHeaders = config.getMapFromKeyValueString(config.getHeaders());
 
-    String url = input.get(httpURLField);
-    Map<String, Object> result = invokeHttp(url);
+    String responseBody = invokeHttp(url, userName, pw, authHeaders, httpHeaders);
+    builder.set(config.getResponseField(),responseBody);
 
     List<Schema.Field> fields = outputSchema.getFields();
     for (Schema.Field field : fields) {
@@ -185,37 +125,94 @@ public class HttpGetTransform extends Transform<StructuredRecord, StructuredReco
       if (input.get(name) != null) {
         builder.set(name, input.get(name));
       }
-
-      if (result.get(name) != null) {
-        builder.set(name, result.get(name));
-      }
     }
+
     emitter.emit(builder.build());
   }
 
+  private String getURL(StructuredRecord input) throws Exception {
+    //Check if input record contains the HTTP URL Get URL
+    if (input.get(httpURLField) == null) {
+      new Exception("Input Record does not contain field " + httpURLField);
+    }
+    return input.get(httpURLField);
+  }
 
-  private Map<String, Object> invokeHttp(String url) throws IOException {
-    CloseableHttpClient client = null;
+  @Nullable
+  private String getUserName(StructuredRecord input) throws Exception {
+    if (config.getUsername() == null) {
+      return null;
+    }
+    Gson gson = new Gson();
+    Map<String, String> map = gson.fromJson(config.getUsername(), Map.class);
+    String lookup = input.get(config.getAuthLookup());
+    if (!map.containsKey(lookup)) {
+      new Exception("Unable to find Username for " + lookup);
+
+    }
+    return map.get(lookup);
+  }
+
+  @Nullable
+  private String getPassword(StructuredRecord input) throws Exception {
+    if (config.getPassword() == null) {
+      return null;
+    }
+    Gson gson = new Gson();
+    Map<String, String> map = gson.fromJson(config.getPassword(), Map.class);
+    String lookup = input.get(config.getAuthLookup());
+    if (!map.containsKey(lookup)) {
+      new Exception("Unable to find Password for " + lookup);
+    }
+    return map.get(lookup);
+  }
+
+  @Nullable
+  private Map<String, String> getAuthHeader(StructuredRecord input) throws Exception {
+    if (config.getAuthToken() == null) {
+      return null;
+    }
+
+    Gson gson = new Gson();
+    Map<String, String> map = gson.fromJson(config.getAuthToken(), Map.class);
+    String lookup = input.get(config.getAuthLookup());
+    if (!map.containsKey(lookup)) {
+      new Exception("Unable to find Authtoken for " + lookup);
+    }
+    Map<String,String> hdr = new HashMap<String, String>();
+    hdr.put("Authorization",map.get(lookup));
+    return hdr;
+  }
+
+
+  private String invokeHttp(String url, String userName, String password, Map<String, String> authHeaders, Map<String, String> httpHeaders) throws IOException {
+
+    CloseableHttpClient httpclient = null;
     try {
-      CloseableHttpClient httpclient = HttpClients.createDefault();
+      httpclient = HttpClient.getInstance(url, userName, password, authHeaders, httpHeaders);
       HttpGet get = new HttpGet(url);
       HttpResponse response = httpclient.execute(get);
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode != 200) {
-        throw new IOException("Failed invoking URL - " + url + " with HTTP error code : " + statusCode);
+        //throw new IOException("Failed invoking URL - " + url + " with HTTP error code : " + statusCode);
+        String error = "{ \"httperror\": { \"code\": \"" + statusCode + "\", \"message\": \"Error Invoking URL "+ url +" \"} }";
+        return error;
       }
       HttpEntity httpEntity = response.getEntity();
-      Gson gson = new GsonBuilder().create();
-      Reader reader = new InputStreamReader(httpEntity.getContent(), Charset.forName("UTF-8"));
-      return gson.fromJson(reader, new TypeToken<Map<String, Object>>() {
-      }.getType());
+      byte[] bytes = bytes = EntityUtils.toByteArray(httpEntity);
+      String body = new String(bytes, StandardCharsets.UTF_8);
+      return body;
 
 
-    } finally {
-      if (client != null) {
-        client.close();
+    } catch (Exception ex){
+      String error = "{ \"httperror\": { \"code\": \"" + 500 + "\", \"message\": \"Error Invoking URL "+ url +" " + ex.getLocalizedMessage() +" \"} }";
+      return error;
+    }finally {
+      if (httpclient != null) {
+        httpclient.close();
       }
     }
   }
+
 
 }

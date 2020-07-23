@@ -1,0 +1,123 @@
+{
+  "metadata": {
+    "spec-version": "1.6"
+  },
+  "configuration-groups": [
+    {
+      "label": "Configuration ",
+      "properties": [
+        {
+          "widget-type": "text",
+          "label": "Input field containing URL to invoke.",
+          "name": "httpURLField",
+          "description": "Field name containing the full URL to use for HTTPGet method."
+        },
+        {
+          "widget-type": "select",
+          "label": "HTTP Method",
+          "name": "httpMethod",
+          "widget-attributes": {
+            "values": [
+              "GET"
+            ],
+            "default": "GET"
+          }
+        },
+        {
+          "widget-type": "keyvalue",
+          "label": "Headers",
+          "name": "headers",
+          "widget-attributes": {
+            "showDelimiter": "false"
+          }
+        },
+        {
+          "widget-type": "textbox",
+          "label": "Request Body",
+          "name": "requestBody",
+          "description": "Request Body of message for HTTP Post Request"
+        }
+      ]
+    },
+    {
+      "label": "Response",
+      "properties": [
+        {
+          "widget-type": "textbox",
+          "label": "HTTPResponse Output Field",
+          "name": "responseField",
+          "description": "Output schema field to store the response of HTTP request."
+        }
+      ]
+    },
+    {
+      "label": "Basic Authentication",
+      "properties": [
+        {
+          "widget-type": "textbox",
+          "label": "Username",
+          "name": "username",
+          "description": "To support Input record driven authentication, the username is a JSON containing mappings for each marketing program. eg: { '291':'345f45', '415':'4fd56' }"
+        },
+        {
+          "widget-type": "password",
+          "label": "Password",
+          "name": "password",
+          "description": "To support Input record driven authentication, the password is a JSON containing mappings for each marketing program. eg: { '291':'4d6se', '415':'guidwx' }"
+        }
+      ]
+    },
+    {
+      "label": "Token Authentication",
+      "properties": [
+        {
+          "widget-type": "textbox",
+          "label": "Auth Token",
+          "name": "authToken",
+          "description": "To support Input record driven authentication, the auth token is a JSON containing mappings for each marketing program. eg: { '291':'345f45', '415':'4fd56' }"
+        }
+      ]
+    },
+    {
+      "label": "Authentication Value Lookup",
+      "properties": [
+        {
+          "widget-type": "textbox",
+          "label": "Input Field to Lookup",
+          "name": "authLookup",
+          "description": "Input field to be used to lookup the Authentaiton (Basic & Token) JSON Lookup"
+        }
+      ]
+    }
+  ],
+  "emit-alerts": false,
+  "emit-errors": false,
+  "outputs": [
+    {
+      "name": "schema",
+      "label": "schema",
+      "widget-type": "schema",
+      "widget-attributes": {
+        "schema-types": [
+          "string"
+        ],
+        "schema-default-type": "string",
+        "property-watch": "format"
+      }
+    }
+  ],
+  "filters": [
+    {
+      "name": "PostBody",
+      "condition": {
+        "expression": "httpMethod == 'POST'"
+      },
+      "show": [
+        {
+          "name": "requestBody",
+          "type": "property"
+        }
+      ]
+    }
+  ]
+}
